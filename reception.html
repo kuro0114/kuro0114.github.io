@@ -216,6 +216,54 @@
             flex-shrink: 0;
         }
 
+        /* 記録閲覧 */
+        .record-list { margin-top: 14px; }
+        .record-card {
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        .record-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: #F8F9FA;
+            cursor: pointer;
+            user-select: none;
+        }
+        .record-header:active { background: #EEF3FA; }
+        .record-header-left { display: flex; align-items: center; gap: 12px; }
+        .record-time { font-size: 15px; font-weight: bold; color: #1F497D; white-space: nowrap; }
+        .record-summary { font-size: 15px; color: #333; }
+        .record-status {
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+        .status-active { background: #E8F5E9; color: #2E7D32; }
+        .status-done   { background: #EEEEEE; color: #777; }
+        .record-detail {
+            display: none;
+            padding: 12px 16px;
+            border-top: 1px solid #EEE;
+            background: white;
+        }
+        .record-detail.open { display: block; }
+        .record-detail-row {
+            display: flex;
+            gap: 8px;
+            padding: 4px 0;
+            font-size: 14px;
+            border-bottom: 1px solid #F5F5F5;
+        }
+        .record-detail-row:last-child { border-bottom: none; }
+        .record-detail-label { color: #888; width: 90px; flex-shrink: 0; }
+        .record-detail-value { color: #333; }
+        .record-none { text-align: center; padding: 24px; color: #AAA; font-size: 15px; }
+
         /* チェックボックス */
         .checkbox-label {
             display: flex;
@@ -431,6 +479,17 @@
             <div class="mgmt-info">最古の記録：<span id="mgmt-oldest">－</span></div>
             <div class="mgmt-info">最新の記録：<span id="mgmt-newest">－</span></div>
             <div class="mgmt-info">推定使用容量：<span id="mgmt-size">0</span> KB</div>
+        </div>
+
+        <!-- 記録の閲覧 -->
+        <div class="mgmt-card">
+            <div class="mgmt-card-title">📋 記録の閲覧</div>
+            <div class="export-date-row">
+                <input type="date" id="view-date" class="date-input">
+                <button class="btn-export" onclick="renderRecordView()">表示</button>
+            </div>
+            <div class="export-count" id="view-date-count"></div>
+            <div class="record-list" id="record-list"></div>
         </div>
 
         <!-- CSVエクスポート -->
@@ -658,14 +717,101 @@ function gotoMgmt() {
     const bytes = new Blob([localStorage.getItem('visitors') || '']).size;
     document.getElementById('mgmt-size').textContent = Math.ceil(bytes / 1024);
 
-    // 日付指定エクスポートの初期値を前日に設定
+    // 日付入力の初期値を前日に設定
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const dateInput = document.getElementById('export-date');
-    dateInput.value = fmtDate(yesterday);
+    const yStr = fmtDate(yesterday);
+
+    const exportDateInput = document.getElementById('export-date');
+    exportDateInput.value = yStr;
     updateExportCount();
 
+    const viewDateInput = document.getElementById('view-date');
+    viewDateInput.value = yStr;
+    document.getElementById('view-date-count').textContent = '';
+    document.getElementById('record-list').innerHTML = '';
+
     showScreen('screen-mgmt');
+}
+
+// ===== 記録閲覧 =====
+function renderRecordView() {
+    const dateVal = document.getElementById('view-date').value;
+    if (!dateVal) { notify('日付を選択してください', 'error'); return; }
+
+    const data = getRecords().filter(r => r.date === dateVal)
+        .sort((a, b) => a.entryTime.localeCompare(b.entryTime));
+
+    const countEl = document.getElementById('view-date-count');
+    const listEl  = document.getElementById('record-list');
+
+    if (!data.length) {
+        countEl.textContent = `${dateVal} の記録はありません`;
+        listEl.innerHTML = '';
+        return;
+    }
+
+    countEl.textContent = `${dateVal} の記録：${data.length}件`;
+    listEl.innerHTML = data.map((r, i) => `
+        <div class="record-card">
+            <div class="record-header" onclick="toggleRecord(${i})">
+                <div class="record-header-left">
+                    <span class="record-time">${r.entryTime}</span>
+                    <span class="record-summary">${r.company}　${r.name}</span>
+                </div>
+                <span class="record-status ${r.exitTime ? 'status-done' : 'status-active'}">
+                    ${r.exitTime ? '退場済' : '入場中'}
+                </span>
+            </div>
+            <div class="record-detail" id="record-detail-${i}">
+                <div class="record-detail-row">
+                    <span class="record-detail-label">会社名</span>
+                    <span class="record-detail-value">${r.company}</span>
+                </div>
+                <div class="record-detail-row">
+                    <span class="record-detail-label">氏名</span>
+                    <span class="record-detail-value">${r.name}</span>
+                </div>
+                <div class="record-detail-row">
+                    <span class="record-detail-label">人数</span>
+                    <span class="record-detail-value">${r.people}名</span>
+                </div>
+                <div class="record-detail-row">
+                    <span class="record-detail-label">用件</span>
+                    <span class="record-detail-value">${r.purpose}</span>
+                </div>
+                <div class="record-detail-row">
+                    <span class="record-detail-label">車両番号</span>
+                    <span class="record-detail-value">${r.vehicle || '－'}</span>
+                </div>
+                <div class="record-detail-row">
+                    <span class="record-detail-label">体温確認</span>
+                    <span class="record-detail-value">${r.temperature}</span>
+                </div>
+                <div class="record-detail-row">
+                    <span class="record-detail-label">入館証</span>
+                    <span class="record-detail-value">${r.badge}</span>
+                </div>
+                <div class="record-detail-row">
+                    <span class="record-detail-label">入場時刻</span>
+                    <span class="record-detail-value">${r.entryTime}</span>
+                </div>
+                <div class="record-detail-row">
+                    <span class="record-detail-label">退場時刻</span>
+                    <span class="record-detail-value">${r.exitTime || '－（未退場）'}</span>
+                </div>
+                <div class="record-detail-row">
+                    <span class="record-detail-label">入館証返却</span>
+                    <span class="record-detail-value">${r.badgeReturned ? '✅ 確認済' : '⬜ 未確認'}</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function toggleRecord(i) {
+    const el = document.getElementById(`record-detail-${i}`);
+    el.classList.toggle('open');
 }
 
 function updateExportCount() {

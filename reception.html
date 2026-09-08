@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="来訪者受付">
     <title>来訪者受付システム</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -907,6 +910,13 @@ function doExport(data, filename) {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('export-date').addEventListener('change', updateExportCount);
 });
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js');
+    });
+}
 </script>
 </body>
 </html>

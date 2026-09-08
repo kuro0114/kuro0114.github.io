@@ -149,6 +149,9 @@
         .radio-label input[type="radio"] { width: 18px; height: 18px; }
         .radio-label:has(input:checked) { border-color: #1F497D; background: #EEF3FA; }
 
+        .hidden { display: none !important; }
+        .field-note { font-size: 13px; color: #888; margin-top: 6px; }
+
         /* フォームフッター */
         .form-footer {
             display: flex;
@@ -414,6 +417,10 @@
                 </div>
             </div>
             <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">電話番号<span class="required">＊</span></label>
+                    <input type="tel" id="e-phone" class="form-input" placeholder="例：090-1234-5678">
+                </div>
                 <div class="form-group" style="max-width:180px;">
                     <label class="form-label">来訪人数<span class="required">＊</span></label>
                     <input type="number" id="e-people" class="form-input" placeholder="例：2" min="1">
@@ -428,10 +435,24 @@
                         <option>その他</option>
                     </select>
                 </div>
-                <div class="form-group" style="max-width:180px;">
-                    <label class="form-label">入館証番号<span class="required">＊</span></label>
-                    <input type="number" id="e-badge" class="form-input" placeholder="例：22" min="1">
+            </div>
+            <div class="form-group">
+                <label class="form-label">入場区分<span class="required">＊</span></label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="area" value="工場" onchange="onAreaChange()">
+                        工場に入場する（入館証あり）
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="area" value="管理棟のみ" onchange="onAreaChange()">
+                        管理棟のみ
+                    </label>
                 </div>
+            </div>
+            <div class="form-group hidden" id="badge-group">
+                <label class="form-label">入館証番号<span class="required">＊</span></label>
+                <input type="text" id="e-badge" class="form-input" placeholder="例：22　／　複数の場合：22, 23, 24">
+                <div class="field-note">※ 代表者1名のみの場合は1つ、全員に配布する場合はカンマ区切りで入力してください</div>
             </div>
             <div class="form-group">
                 <label class="form-label">車両番号（任意）</label>
@@ -560,10 +581,11 @@
     <div class="confirm-box">
         <div class="confirm-row" id="c-name"></div>
         <div class="confirm-row" id="c-company"></div>
+        <div class="confirm-row" id="c-area"></div>
         <div class="confirm-row" id="c-entry"></div>
         <div class="confirm-row" id="c-badge"></div>
     </div>
-    <label class="checkbox-label">
+    <label class="checkbox-label" id="badge-check-row">
         <input type="checkbox" id="badge-check">
         入館証の返却を確認した
     </label>
@@ -617,25 +639,63 @@ function fmtTime(d) {
     return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
+// ===== 入館証ユーティリティ =====
+// 旧データ（badge: 数値）と新データ（badges: 配列）の両方に対応
+function getBadges(r) {
+    if (Array.isArray(r.badges)) return r.badges;
+    if (r.badge !== undefined && r.badge !== null && r.badge !== '') return [String(r.badge)];
+    return [];
+}
+function badgeText(r) {
+    const b = getBadges(r);
+    return b.length ? b.join('・') : '';
+}
+// カンマ・読点・スペース区切りを配列化
+function parseBadges(text) {
+    return text.split(/[,、\s]+/).map(s => s.trim()).filter(s => s !== '');
+}
+
 // ===== 入場処理 =====
 function resetEntry() {
-    ['e-name','e-company','e-people','e-purpose','e-vehicle','e-badge'].forEach(id => {
+    ['e-name','e-company','e-phone','e-people','e-purpose','e-vehicle','e-badge'].forEach(id => {
         document.getElementById(id).value = '';
     });
     document.querySelectorAll('input[name="temp"]').forEach(r => r.checked = false);
+    document.querySelectorAll('input[name="area"]').forEach(r => r.checked = false);
+    document.getElementById('badge-group').classList.add('hidden');
+}
+
+// 入場区分の切替で入館証番号欄を出し分け
+function onAreaChange() {
+    const areaEl = document.querySelector('input[name="area"]:checked');
+    const group  = document.getElementById('badge-group');
+    if (areaEl && areaEl.value === '工場') {
+        group.classList.remove('hidden');
+    } else {
+        group.classList.add('hidden');
+        document.getElementById('e-badge').value = '';
+    }
 }
 
 function submitEntry() {
     const name    = document.getElementById('e-name').value.trim();
     const company = document.getElementById('e-company').value.trim();
+    const phone   = document.getElementById('e-phone').value.trim();
     const people  = document.getElementById('e-people').value;
     const purpose = document.getElementById('e-purpose').value;
-    const badge   = document.getElementById('e-badge').value;
     const vehicle = document.getElementById('e-vehicle').value.trim();
     const tempEl  = document.querySelector('input[name="temp"]:checked');
+    const areaEl  = document.querySelector('input[name="area"]:checked');
 
-    if (!name || !company || !people || !purpose || !badge || !tempEl) {
+    if (!name || !company || !phone || !people || !purpose || !areaEl || !tempEl) {
         notify('必須項目をすべて入力してください', 'error'); return;
+    }
+
+    const area   = areaEl.value;
+    const badges = area === '工場' ? parseBadges(document.getElementById('e-badge').value) : [];
+
+    if (area === '工場' && !badges.length) {
+        notify('入館証番号を入力してください', 'error'); return;
     }
     if (tempEl.value.includes('37.5')) {
         notify('体温が37.5度以上のため入場できません', 'error'); return;
@@ -647,11 +707,11 @@ function submitEntry() {
         id:            nextId(),
         date:          fmtDate(now),
         entryTime:     fmtTime(now),
-        name, company,
+        name, company, phone, area,
         people:        parseInt(people),
         purpose, vehicle,
         temperature:   tempEl.value,
-        badge:         parseInt(badge),
+        badges:        badges,
         exitTime:      null,
         badgeReturned: false
     });
@@ -669,7 +729,7 @@ function renderExitList() {
             <div class="visitor-card" onclick="selectVisitor(${r.id})">
                 <div>
                     <div class="visitor-name">${r.company}　${r.name}</div>
-                    <div class="visitor-detail">入場：${r.entryTime}　　入館証：${r.badge}</div>
+                    <div class="visitor-detail">入場：${r.entryTime}　　${badgeText(r) ? '入館証：' + badgeText(r) : '管理棟のみ'}</div>
                 </div>
                 <div class="visitor-arrow">›</div>
             </div>`).join('')
@@ -683,22 +743,38 @@ function selectVisitor(id) {
     const v = getRecords().find(r => r.id === id);
     document.getElementById('c-name').textContent    = '氏名　　：' + v.name;
     document.getElementById('c-company').textContent = '会社名　：' + v.company;
+    document.getElementById('c-area').textContent    = '入場区分：' + (v.area || (badgeText(v) ? '工場' : '－'));
     document.getElementById('c-entry').textContent   = '入場時刻：' + v.entryTime;
-    document.getElementById('c-badge').textContent   = '入館証　：' + v.badge;
-    document.getElementById('badge-check').checked   = false;
+
+    // 入館証を配布した場合のみ、番号表示と返却確認チェックを出す
+    const badges     = badgeText(v);
+    const badgeRow   = document.getElementById('c-badge');
+    const checkRow   = document.getElementById('badge-check-row');
+    document.getElementById('badge-check').checked = false;
+
+    if (badges) {
+        badgeRow.textContent = '入館証　：' + badges;
+        badgeRow.classList.remove('hidden');
+        checkRow.classList.remove('hidden');
+    } else {
+        badgeRow.classList.add('hidden');
+        checkRow.classList.add('hidden');
+    }
     showScreen('screen-exit-confirm');
 }
 
 function submitExit() {
-    if (!document.getElementById('badge-check').checked) {
+    const records = getRecords();
+    const idx = records.findIndex(r => r.id === selectedId);
+    const hasBadge = idx !== -1 && badgeText(records[idx]) !== '';
+
+    if (hasBadge && !document.getElementById('badge-check').checked) {
         notify('入館証の返却確認チェックを入れてください', 'error'); return;
     }
     const now = new Date();
-    const records = getRecords();
-    const idx = records.findIndex(r => r.id === selectedId);
     if (idx !== -1) {
-        records[idx].exitTime     = fmtTime(now);
-        records[idx].badgeReturned = true;
+        records[idx].exitTime      = fmtTime(now);
+        records[idx].badgeReturned = hasBadge;
         saveRecords(records);
     }
     showScreen('screen-top');
@@ -776,8 +852,16 @@ function renderRecordView() {
                     <span class="record-detail-value">${r.name}</span>
                 </div>
                 <div class="record-detail-row">
+                    <span class="record-detail-label">電話番号</span>
+                    <span class="record-detail-value">${r.phone || '－'}</span>
+                </div>
+                <div class="record-detail-row">
                     <span class="record-detail-label">人数</span>
                     <span class="record-detail-value">${r.people}名</span>
+                </div>
+                <div class="record-detail-row">
+                    <span class="record-detail-label">入場区分</span>
+                    <span class="record-detail-value">${r.area || (badgeText(r) ? '工場' : '－')}</span>
                 </div>
                 <div class="record-detail-row">
                     <span class="record-detail-label">用件</span>
@@ -793,7 +877,7 @@ function renderRecordView() {
                 </div>
                 <div class="record-detail-row">
                     <span class="record-detail-label">入館証</span>
-                    <span class="record-detail-value">${r.badge}</span>
+                    <span class="record-detail-value">${badgeText(r) || '－（配布なし）'}</span>
                 </div>
                 <div class="record-detail-row">
                     <span class="record-detail-label">入場時刻</span>
@@ -805,7 +889,7 @@ function renderRecordView() {
                 </div>
                 <div class="record-detail-row">
                     <span class="record-detail-label">入館証返却</span>
-                    <span class="record-detail-value">${r.badgeReturned ? '✅ 確認済' : '⬜ 未確認'}</span>
+                    <span class="record-detail-value">${!badgeText(r) ? '－（対象外）' : (r.badgeReturned ? '✅ 確認済' : '⬜ 未確認')}</span>
                 </div>
             </div>
         </div>
@@ -886,11 +970,13 @@ function exportCSV(range) {
 }
 
 function doExport(data, filename) {
-    const headers = ['日付','氏名','会社名','人数','用件','車両番号','体温確認','入館証番号','入場時刻','退場時刻','入館証返却'];
+    const headers = ['日付','氏名','会社名','電話番号','人数','用件','入場区分','車両番号','体温確認','入館証番号','入場時刻','退場時刻','入館証返却'];
     const rows = data.map(r => [
-        r.date, r.name, r.company, r.people, r.purpose,
-        r.vehicle || '', r.temperature, r.badge,
-        r.entryTime, r.exitTime || '', r.badgeReturned ? '確認済' : '未確認'
+        r.date, r.name, r.company, r.phone || '', r.people, r.purpose,
+        r.area || (badgeText(r) ? '工場' : ''),
+        r.vehicle || '', r.temperature, badgeText(r),
+        r.entryTime, r.exitTime || '',
+        !badgeText(r) ? '対象外' : (r.badgeReturned ? '確認済' : '未確認')
     ]);
     const csv = '﻿' + [headers, ...rows]
         .map(row => row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))

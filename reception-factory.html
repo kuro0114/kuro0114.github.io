@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="来訪者受付">
+    <title>来訪者受付システム（工場入場チェック統合版）</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            background-color: #F5F7FA;
+            color: #333;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .screen { display: none; height: 100vh; overflow-y: auto; flex-direction: column; }
+        .screen.active { display: flex; }
+
+        /* ヘッダー */
+        .header {
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            height: 60px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .header-blue   { background-color: #1F497D; }
+        .header-teal   { background-color: #00695C; }
+        .header-green  { background-color: #2E7D32; }
+
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.5);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-right: 16px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .header-title { flex: 1; text-align: center; padding-right: 80px; }
+
+        /* トップ画面 */
+        #screen-top {
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .top-title {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1F497D;
+            margin-bottom: 8px;
+        }
+        .top-sub { font-size: 14px; color: #888; margin-bottom: 44px; }
+        .top-buttons { display: flex; gap: 40px; margin-bottom: 30px; }
+        .top-btn {
+            width: 280px;
+            height: 160px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: opacity 0.1s;
+        }
+        .top-btn:active { opacity: 0.8; }
+        .top-btn-entry { background-color: #1F497D; }
+        .top-btn-exit  { background-color: #2E7D32; }
+
+        .btn-export {
+            background: white;
+            border: 2px solid #1F497D;
+            color: #1F497D;
+            padding: 10px 24px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .btn-export:active { background: #EEF3FA; }
+        .export-date-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+        .date-input {
+            padding: 10px 14px;
+            font-size: 15px;
+            border: 1px solid #CCC;
+            border-radius: 6px;
+            font-family: inherit;
+        }
+        .export-count { font-size: 14px; color: #888; margin-top: 8px; }
+
+        /* フォーム */
+        .form-scroll { flex: 1; overflow-y: auto; }
+        .form-content { padding: 20px 40px 40px; }
+        .form-row { display: flex; gap: 24px; }
+        .form-row .form-group { flex: 1; }
+        .form-group { margin-bottom: 18px; }
+        .form-label { display: block; font-size: 14px; font-weight: bold; margin-bottom: 6px; }
+        .required { color: #C0392B; margin-left: 3px; }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 1px solid #CCC;
+            border-radius: 6px;
+            background: white;
+            font-family: inherit;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #1F497D;
+            box-shadow: 0 0 0 2px rgba(31,73,125,0.15);
+        }
+
+        /* ラジオボタン */
+        .radio-group { display: flex; gap: 16px; flex-wrap: wrap; }
+        .radio-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            cursor: pointer;
+            padding: 12px 20px;
+            border: 2px solid #CCC;
+            border-radius: 8px;
+            background: white;
+            transition: border-color 0.1s;
+        }
+        .radio-label input[type="radio"] { width: 18px; height: 18px; }
+        .radio-label:has(input:checked) { border-color: #1F497D; background: #EEF3FA; }
+
+        .hidden { display: none !important; }
+        .field-note { font-size: 13px; color: #888; margin-top: 6px; }
+
+        /* フォームフッター */
+        .form-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 16px;
+            margin-top: 8px;
+        }
+
+        /* ボタン */
+        .btn {
+            padding: 14px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.1s;
+        }
+        .btn:active { opacity: 0.8; }
+        .btn-primary { background-color: #1F497D; color: white; }
+        .btn-teal    { background-color: #00695C; color: white; }
+        .btn-success { background-color: #2E7D32; color: white; }
+
+        /* ===== 工場入場チェック ===== */
+        .section-box {
+            background: white;
+            border: 1px solid #DDD;
+            border-radius: 8px;
+            padding: 18px 22px;
+            margin-bottom: 18px;
+        }
+        .section-box-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #00695C;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #EEE;
+        }
+
+        /* 同行者候補チップ */
+        .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .chip {
+            background: #E0F2F1;
+            border: 1px solid #4DB6AC;
+            color: #00695C;
+            padding: 7px 14px;
+            font-size: 14px;
+            border-radius: 16px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .chip:active { background: #B2DFDB; }
+        .chip-label { font-size: 13px; color: #888; margin-top: 12px; }
+
+        /* 入場者行 */
+        .member-head, .member-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+        }
+        .member-head { font-size: 12px; color: #888; font-weight: bold; border-bottom: 1px solid #EEE; padding-bottom: 6px; }
+        .member-row { border-bottom: 1px solid #F5F5F5; }
+        .m-no    { width: 28px; text-align: center; font-size: 14px; color: #666; flex-shrink: 0; }
+        .m-name  { flex: 1; min-width: 0; }
+        .m-temp  { width: 92px; flex-shrink: 0; }
+        .m-unit  { width: 18px; font-size: 14px; color: #666; flex-shrink: 0; }
+        .m-tgl   { width: 96px; flex-shrink: 0; }
+        .m-del   { width: 34px; flex-shrink: 0; }
+
+        .member-row input {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 16px;
+            border: 1px solid #CCC;
+            border-radius: 6px;
+            font-family: inherit;
+        }
+        .member-row input:focus { outline: none; border-color: #00695C; }
+
+        .toggle-btn {
+            width: 100%;
+            padding: 10px 4px;
+            font-size: 13px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            border: 2px solid transparent;
+        }
+        .tg-ok { background: #E8F5E9; border-color: #A5D6A7; color: #2E7D32; }
+        .tg-ng { background: #FFEBEE; border-color: #EF9A9A; color: #C0392B; }
+
+        .row-del-btn {
+            width: 100%;
+            padding: 9px 0;
+            background: white;
+            border: 1px solid #DDD;
+            color: #999;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-add-row {
+            margin-top: 12px;
+            background: white;
+            border: 2px dashed #4DB6AC;
+            color: #00695C;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        /* 注意事項 */
+        .notice-item {
+            font-size: 14px;
+            line-height: 1.7;
+            padding: 7px 0 7px 20px;
+            text-indent: -20px;
+            border-bottom: 1px dotted #EEE;
+        }
+        .notice-item:last-child { border-bottom: none; }
+        .notice-strong { color: #C0392B; font-weight: bold; }
+
+        .pledge-text {
+            font-size: 15px;
+            line-height: 1.8;
+            padding: 14px 18px;
+            background: #F5F7FA;
+            border-left: 4px solid #1F497D;
+            border-radius: 4px;
+        }
+
+        .confirm-check {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 14px 16px;
+            margin-top: 12px;
+            border-radius: 8px;
+            line-height: 1.5;
+        }
+        .confirm-check input[type="checkbox"] { width: 26px; height: 26px; flex-shrink: 0; }
+        .check-pledge { background: #E8F0FA; border: 2px solid #1F497D; }
+        .check-staff  { background: #FFF8E1; border: 2px solid #FFD54F; }
+        .check-sub { font-size: 13px; font-weight: normal; color: #666; }
+
+        /* 承認 */
+        .btn-approve {
+            background: #2E7D32;
+            border: none;
+            color: white;
+            padding: 11px 24px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-approve:active { opacity: 0.8; }
+        .approve-status {
+            font-size: 15px;
+            font-weight: bold;
+            margin-top: 12px;
+            padding: 12px 16px;
+            border-radius: 6px;
+        }
+        .appr-done    { background: #E8F5E9; color: #2E7D32; }
+        .appr-pending { background: #FFF3E0; color: #E65100; }
+        .appr-none    { background: #F5F5F5; color: #888; }
+        .status-approved { background: #E3F2FD; color: #1565C0; }
+
+        /* 退場一覧 */
+        .visitor-count {
+            padding: 14px 40px 8px;
+            font-size: 16px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .visitor-list { flex: 1; overflow-y: auto; padding: 0 40px 20px; }
+        .visitor-card {
+            background: white;
+            border: 1px solid #DDD;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .visitor-card:active { background: #EEF3FA; }
+        .visitor-name { font-size: 18px; font-weight: bold; color: #1F497D; margin-bottom: 4px; }
+        .visitor-detail { font-size: 14px; color: #666; }
+        .visitor-arrow { font-size: 28px; color: #AAA; }
+        .no-visitors { text-align: center; padding: 60px; color: #999; font-size: 18px; }
+
+        /* 退場確認 */
+        .confirm-box {
+            background: white;
+            border: 1px solid #CCC;
+            border-radius: 8px;
+            margin: 8px 40px 16px;
+        }
+        .confirm-row {
+            font-size: 16px;
+            padding: 14px 20px;
+            border-bottom: 1px solid #F0F0F0;
+        }
+        .confirm-row:last-child { border-bottom: none; }
+        .section-title {
+            padding: 16px 40px 4px;
+            font-size: 16px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 12px 40px;
+        }
+        .checkbox-label input[type="checkbox"] { width: 24px; height: 24px; }
+
+        /* 記録閲覧 */
+        .record-list { margin-top: 14px; }
+        .record-card { border: 1px solid #E0E0E0; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+        .record-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 16px; background: #F8F9FA; cursor: pointer; user-select: none;
+        }
+        .record-header:active { background: #EEF3FA; }
+        .record-header-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .record-time { font-size: 15px; font-weight: bold; color: #1F497D; white-space: nowrap; }
+        .record-summary { font-size: 15px; }
+        .record-status { font-size: 12px; padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
+        .status-active { background: #E8F5E9; color: #2E7D32; }
+        .status-done   { background: #EEEEEE; color: #777; }
+        .status-factory { background: #E0F2F1; color: #00695C; }
+        .record-detail { display: none; padding: 12px 16px; border-top: 1px solid #EEE; background: white; }
+        .record-detail.open { display: block; }
+        .record-detail-row {
+            display: flex; gap: 8px; padding: 4px 0; font-size: 14px; border-bottom: 1px solid #F5F5F5;
+        }
+        .record-detail-row:last-child { border-bottom: none; }
+        .record-detail-label { color: #888; width: 100px; flex-shrink: 0; }
+        .record-detail-value { flex: 1; }
+        .record-none { text-align: center; padding: 24px; color: #AAA; font-size: 15px; }
+        .member-mini {
+            font-size: 13px; padding: 4px 0 4px 10px; border-left: 2px solid #B2DFDB; margin: 3px 0;
+        }
+
+        /* データ管理 */
+        .mgmt-area { position: absolute; bottom: 24px; width: 100%; text-align: center; }
+        .btn-mgmt {
+            background: white; border: 1px solid #999; color: #666;
+            padding: 8px 18px; font-size: 13px; border-radius: 6px; cursor: pointer;
+        }
+        .mgmt-content { padding: 20px 40px; flex: 1; overflow-y: auto; }
+        .mgmt-card {
+            background: white; border: 1px solid #DDD; border-radius: 8px;
+            padding: 20px 24px; margin-bottom: 20px;
+        }
+        .mgmt-card-title {
+            font-size: 16px; font-weight: bold; margin-bottom: 12px;
+            padding-bottom: 10px; border-bottom: 1px solid #EEE;
+        }
+        .mgmt-info { font-size: 15px; color: #555; margin-bottom: 8px; }
+        .mgmt-info span { font-weight: bold; color: #1F497D; }
+        .mgmt-row { display: flex; align-items: center; gap: 16px; margin-top: 14px; flex-wrap: wrap; }
+        .btn-delete {
+            background: white; border: 2px solid #C0392B; color: #C0392B;
+            padding: 10px 24px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer;
+        }
+        .btn-delete:active { background: #fff0ee; }
+        .days-input {
+            width: 80px; padding: 10px 12px; font-size: 15px;
+            border: 1px solid #CCC; border-radius: 6px; text-align: center;
+        }
+        .mgmt-note { font-size: 13px; color: #888; margin-top: 10px; }
+
+        /* モーダル */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5); z-index: 2000;
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: white; border-radius: 12px; padding: 32px 40px;
+            max-width: 480px; width: 90%; text-align: center;
+        }
+        .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 16px; }
+        .modal-msg { font-size: 15px; color: #555; margin-bottom: 28px; line-height: 1.6; white-space: pre-line; }
+        .modal-buttons { display: flex; gap: 16px; justify-content: center; }
+        .btn-modal-cancel { background: #EEE; color: #333; border: none; padding: 12px 32px; font-size: 16px; border-radius: 8px; cursor: pointer; }
+        .btn-modal-ok { background: #C0392B; color: white; border: none; padding: 12px 32px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; }
+
+        /* 通知 */
+        #notification {
+            position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+            padding: 14px 28px; border-radius: 8px; font-size: 16px; font-weight: bold;
+            color: white; z-index: 3000; display: none; max-width: 85%; text-align: center;
+        }
+        #notification.success { background-color: #2E7D32; }
+        #notification.error   { background-color: #C0392B; }
+    </style>
+</head>
+<body>
+
+<div id="notification"></div>
+
+<!-- ① トップ画面 -->
+<div id="screen-top" class="screen active">
+    <div class="top-title">来訪者受付</div>
+    <div class="top-sub">工場入場チェック統合版</div>
+    <div class="top-buttons">
+        <button class="top-btn top-btn-entry" onclick="gotoEntry()">入場手続き</button>
+        <button class="top-btn top-btn-exit"  onclick="gotoExitList()">退場手続き</button>
+    </div>
+    <div class="mgmt-area">
+        <button class="btn-mgmt" onclick="gotoMgmt()">データ管理・エクスポート</button>
+    </div>
+</div>
+
+<!-- ② 入場フォーム（基本情報） -->
+<div id="screen-entry" class="screen">
+    <div class="header header-blue">
+        <button class="back-btn" onclick="showScreen('screen-top'); resetEntry()">← 戻る</button>
+        <div class="header-title">入場手続き（1/2）基本情報</div>
+    </div>
+    <div class="form-scroll">
+        <div class="form-content">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">氏名（代表者）<span class="required">＊</span></label>
+                    <input type="text" id="e-name" class="form-input" placeholder="例：山田 太郎">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">会社名<span class="required">＊</span></label>
+                    <input type="text" id="e-company" class="form-input" placeholder="例：○○建設株式会社">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">電話番号<span class="required">＊</span></label>
+                    <input type="tel" id="e-phone" class="form-input" placeholder="例：090-1234-5678">
+                </div>
+                <div class="form-group" style="max-width:180px;">
+                    <label class="form-label">来訪人数<span class="required">＊</span></label>
+                    <input type="number" id="e-people" class="form-input" placeholder="例：2" min="1" value="1">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ご用件<span class="required">＊</span></label>
+                    <select id="e-purpose" class="form-select">
+                        <option value="">選択してください</option>
+                        <option>打合せ</option>
+                        <option>納品</option>
+                        <option>工事</option>
+                        <option>点検・保守</option>
+                        <option>その他</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">入場区分<span class="required">＊</span></label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="area" value="工場" onchange="onAreaChange()">
+                        工場に入場する
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="area" value="管理棟のみ" onchange="onAreaChange()">
+                        管理棟のみ
+                    </label>
+                </div>
+                <div class="field-note" id="area-note"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">車両番号（任意）</label>
+                <input type="text" id="e-vehicle" class="form-input" placeholder="例：品川 300 あ 12-34">
+            </div>
+            <!-- 管理棟のみの場合の体温確認 -->
+            <div class="form-group hidden" id="simple-temp-group">
+                <label class="form-label">体温確認<span class="required">＊</span></label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="temp" value="37.4度以下（入場可）">
+                        37.4度以下（入場可）
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="temp" value="37.5度以上（入場不可）">
+                        37.5度以上（入場不可）
+                    </label>
+                </div>
+            </div>
+            <div class="form-footer">
+                <button class="btn btn-primary" id="btn-entry-next" onclick="entryNext()">入場完了</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ③ 工場入場チェック画面 -->
+<div id="screen-factory" class="screen">
+    <div class="header header-teal">
+        <button class="back-btn" onclick="showScreen('screen-entry')">← 戻る</button>
+        <div class="header-title">入場手続き（2/2）工場入場チェック</div>
+    </div>
+    <div class="form-scroll">
+        <div class="form-content">
+
+            <!-- 入場課・入館証 -->
+            <div class="section-box">
+                <div class="section-box-title">■ 入場先・入館証</div>
+                <div class="form-group">
+                    <label class="form-label">入場課又は箇所<span class="required">＊</span></label>
+                    <select id="f-dept" class="form-select" onchange="onDeptChange()">
+                        <option value="">選択してください</option>
+                        <option>製造1課</option>
+                        <option>製造2課</option>
+                        <option>製造3課</option>
+                        <option>製造4課</option>
+                        <option>工務施設課</option>
+                        <option value="その他">その他</option>
+                    </select>
+                </div>
+                <div class="form-group hidden" id="dept-other-group">
+                    <label class="form-label">その他の入場箇所<span class="required">＊</span></label>
+                    <input type="text" id="f-dept-other" class="form-input" placeholder="例：第2倉庫">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">入館証番号<span class="required">＊</span></label>
+                    <input type="text" id="f-badge" class="form-input" placeholder="例：22　／　複数の場合：22, 23, 24">
+                    <div class="field-note">※ 代表者1名のみの場合は1つ、全員に配布する場合はカンマ区切りで入力してください</div>
+                </div>
+            </div>
+
+            <!-- 入場者一覧 -->
+            <div class="section-box">
+                <div class="section-box-title">■ 入場者 氏名・体温・健康状態（全員分）</div>
+
+                <div id="suggest-area" class="hidden">
+                    <div class="chip-label">過去の来訪者（タップで氏名欄に入力）</div>
+                    <div class="chip-row" id="suggest-chips"></div>
+                </div>
+
+                <div class="member-head" style="margin-top:14px;">
+                    <div class="m-no">No</div>
+                    <div class="m-name">氏名</div>
+                    <div class="m-temp">体温</div>
+                    <div class="m-unit"></div>
+                    <div class="m-tgl" style="text-align:center;">健康状態</div>
+                    <div class="m-tgl" style="text-align:center;">納豆喫食</div>
+                    <div class="m-del"></div>
+                </div>
+                <div id="member-list"></div>
+                <button class="btn-add-row" onclick="addMemberRow()">＋ 入場者を追加</button>
+                <div class="field-note">※ 健康状態・納豆喫食は初期値が「良好」「なし」です。該当者のみタップして切り替えてください</div>
+                <div class="field-note">※ 体温37.5度以上、健康状態不良、納豆喫食ありの方は入場できません</div>
+            </div>
+
+            <!-- 持込品 -->
+            <div class="section-box">
+                <div class="section-box-title">■ 持込品の確認</div>
+                <div class="field-note" style="margin-top:0; margin-bottom:10px;">
+                    持込可能品は、当社指定のバインダーとボールペンのみです。現場に持込希望品があれば許可をとってください。
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">持込品の有無<span class="required">＊</span></label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="carryin" value="無" onchange="onCarryInChange()"> 無
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="carryin" value="有" onchange="onCarryInChange()"> 有
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group hidden" id="carryin-note-group" style="margin-top:16px; margin-bottom:0;">
+                    <label class="form-label">持込品の内容<span class="required">＊</span></label>
+                    <input type="text" id="f-carryin-note" class="form-input" placeholder="例：工具箱、脚立、測定器">
+                    <div class="field-note">※ 退場時に持ち帰り確認を行います</div>
+                </div>
+            </div>
+
+            <!-- 対応者 -->
+            <div class="section-box">
+                <div class="section-box-title">■ 対応者（当社担当者）</div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">対応者氏名<span class="required">＊</span></label>
+                    <input type="text" id="f-staff" class="form-input" placeholder="例：佐藤">
+                </div>
+            </div>
+
+            <!-- 誓約事項・注意事項 -->
+            <div class="section-box">
+                <div class="section-box-title">■ 誓約事項</div>
+                <div class="pledge-text">
+                    業務上知り得た知識及び技術等に関して、当社の許可なく発表・公開・漏洩・利用しないこと。
+                </div>
+
+                <div class="section-box-title" style="margin-top:18px;">■ 入場時の遵守事項</div>
+                <div class="notice-item">※ 工場入場の際は、体全体をローラー掛けしてからつなぎ又は作業着を着用してください。</div>
+                <div class="notice-item">※ 休憩の際は、運転手・外部業者用休憩室をご利用ください。</div>
+                <div class="notice-item"><span class="notice-strong">※ 当日に納豆を喫食された方は、いずれの入場箇所においても入場できません。</span></div>
+                <div class="notice-item">※ 持込可能品は、当社指定のバインダーとボールペンのみです。現場に持込希望品があれば許可をとってください。</div>
+
+                <label class="confirm-check check-pledge">
+                    <input type="checkbox" id="f-pledge">
+                    <span>【来訪者】上記の誓約事項および遵守事項に、入場者全員を代表して同意します<br>
+                    <span class="check-sub" id="pledge-who">同意者：－</span></span>
+                </label>
+
+                <label class="confirm-check check-staff">
+                    <input type="checkbox" id="f-agree">
+                    <span>【受付】上記を来訪者に説明し、入場者全員の体温・健康状態・納豆喫食の有無を確認しました</span>
+                </label>
+            </div>
+
+            <div class="form-footer">
+                <button class="btn btn-teal" onclick="submitFactoryEntry()">入場完了</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ④ 退場一覧 -->
+<div id="screen-exit-list" class="screen">
+    <div class="header header-green">
+        <button class="back-btn" onclick="showScreen('screen-top')">← 戻る</button>
+        <div class="header-title">退場手続き</div>
+    </div>
+    <div class="visitor-count" id="visitor-count">現在入場中：0名</div>
+    <div class="visitor-list" id="visitor-list"></div>
+</div>
+
+<!-- ⑤ 退場確認 -->
+<div id="screen-exit-confirm" class="screen">
+    <div class="header header-green">
+        <button class="back-btn" onclick="showScreen('screen-exit-list')">← 戻る</button>
+        <div class="header-title">退場確認</div>
+    </div>
+    <div class="section-title">退場者の確認</div>
+    <div class="confirm-box">
+        <div class="confirm-row" id="c-name"></div>
+        <div class="confirm-row" id="c-company"></div>
+        <div class="confirm-row" id="c-area"></div>
+        <div class="confirm-row" id="c-people"></div>
+        <div class="confirm-row" id="c-entry"></div>
+        <div class="confirm-row" id="c-badge"></div>
+        <div class="confirm-row" id="c-carryin"></div>
+    </div>
+    <label class="checkbox-label" id="badge-check-row">
+        <input type="checkbox" id="badge-check">
+        入館証の返却を確認した
+    </label>
+    <label class="checkbox-label" id="carryin-check-row">
+        <input type="checkbox" id="carryin-check">
+        持込品の持ち帰りを確認した
+    </label>
+    <div class="form-footer" style="padding: 8px 40px 30px;">
+        <button class="btn btn-success" onclick="submitExit()">退場完了</button>
+    </div>
+</div>
+
+<!-- ⑥ データ管理 -->
+<div id="screen-mgmt" class="screen">
+    <div class="header" style="background:#555;">
+        <button class="back-btn" onclick="showScreen('screen-top')">← 戻る</button>
+        <div class="header-title">データ管理</div>
+    </div>
+    <div class="mgmt-content">
+
+        <div class="mgmt-card">
+            <div class="mgmt-card-title">📊 保存状況</div>
+            <div class="mgmt-info">総レコード数：<span id="mgmt-total">0</span> 件</div>
+            <div class="mgmt-info">最古の記録：<span id="mgmt-oldest">－</span></div>
+            <div class="mgmt-info">最新の記録：<span id="mgmt-newest">－</span></div>
+            <div class="mgmt-info">推定使用容量：<span id="mgmt-size">0</span> KB</div>
+        </div>
+
+        <div class="mgmt-card">
+            <div class="mgmt-card-title">✅ 工場入場記録の承認（業務課課長）</div>
+            <div class="mgmt-info">工場入場記録を日付単位で事後承認します。</div>
+            <div class="export-date-row">
+                <input type="date" id="approve-date" class="date-input">
+                <button class="btn-export" onclick="refreshApprove()">確認</button>
+            </div>
+            <div class="approve-status appr-none" id="approve-status">日付を選んで「確認」をタップしてください</div>
+            <div class="mgmt-row" id="approve-input-row">
+                <span style="font-size:15px;">承認者：</span>
+                <input type="text" id="approve-name" class="date-input" style="width:200px;" placeholder="例：鈴木">
+                <button class="btn-approve" onclick="confirmApprove()">この日の記録を承認する</button>
+            </div>
+            <div class="mgmt-note">※ 承認すると、承認者名と承認日時が記録されCSVにも出力されます</div>
+        </div>
+
+        <div class="mgmt-card">
+            <div class="mgmt-card-title">📋 記録の閲覧</div>
+            <div class="export-date-row">
+                <input type="date" id="view-date" class="date-input">
+                <button class="btn-export" onclick="renderRecordView()">表示</button>
+            </div>
+            <div class="export-count" id="view-date-count"></div>
+            <div class="record-list" id="record-list"></div>
+        </div>
+
+        <div class="mgmt-card">
+            <div class="mgmt-card-title">📥 CSVエクスポート（USBでPC転送用）</div>
+            <div class="mgmt-info" style="margin-bottom:4px;">日付を指定してエクスポート</div>
+            <div class="export-date-row">
+                <input type="date" id="export-date" class="date-input">
+                <button class="btn-export" onclick="exportCSVByDate()">指定日をCSV出力</button>
+            </div>
+            <div class="export-count" id="export-date-count"></div>
+            <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #EEE;">
+                <div class="mgmt-info" style="margin-bottom:10px;">全件エクスポート</div>
+                <button class="btn-export" onclick="exportCSVAll()">全件をCSV出力</button>
+            </div>
+            <div class="mgmt-note">※ CSVは「入場者1名＝1行」で出力されます（トレーサビリティ確保のため）</div>
+        </div>
+
+        <div class="mgmt-card">
+            <div class="mgmt-card-title">🗓️ 古いデータを削除</div>
+            <div class="mgmt-info">CSVエクスポート済みの古いデータを削除できます。</div>
+            <div class="mgmt-row">
+                <span style="font-size:15px;">保存期間：</span>
+                <input type="number" id="keep-days" class="days-input" value="30" min="1">
+                <span style="font-size:15px;">日以上前のデータを削除</span>
+                <button class="btn-delete" onclick="confirmDeleteOld()">削除する</button>
+            </div>
+            <div class="mgmt-note">※ 例：30と入力した場合、30日より前のデータが削除されます</div>
+        </div>
+
+        <div class="mgmt-card">
+            <div class="mgmt-card-title">⚠️ 全データを削除</div>
+            <div class="mgmt-info">保存されているすべての記録を削除します。</div>
+            <div class="mgmt-note" style="margin-bottom:12px;">※ 削除前に必ずCSVエクスポートを行ってください</div>
+            <button class="btn-delete" onclick="confirmDeleteAll()">全件削除する</button>
+        </div>
+
+    </div>
+</div>
+
+<!-- モーダル -->
+<div id="modal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-title" id="modal-title"></div>
+        <div class="modal-msg" id="modal-msg"></div>
+        <div class="modal-buttons">
+            <button class="btn-modal-cancel" onclick="closeModal()">キャンセル</button>
+            <button class="btn-modal-ok" id="modal-ok">削除する</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== ストレージ =====
+// ※ 既存アプリ（reception.html）とは別のキーを使用し、データが混在しないようにしています
+const STORE_KEY = 'visitors_factory';
+
+function getRecords() {
+    return JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+}
+function saveRecords(r) {
+    localStorage.setItem(STORE_KEY, JSON.stringify(r));
+}
+function nextId() {
+    const r = getRecords();
+    return r.length ? Math.max(...r.map(x => x.id)) + 1 : 1;
+}
+
+// ===== 画面遷移 =====
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.getElementById(id).scrollTop = 0;
+}
+function gotoEntry() { resetEntry(); showScreen('screen-entry'); }
+function gotoExitList() { renderExitList(); showScreen('screen-exit-list'); }
+
+// ===== 通知 =====
+function notify(msg, type) {
+    const el = document.getElementById('notification');
+    el.textContent = msg;
+    el.className = type;
+    el.style.display = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ===== 日時 =====
+function fmtDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function fmtTime(d) {
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function fmtDateTime(d) {
+    return fmtDate(d) + ' ' + fmtTime(d);
+}
+function esc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ===== 入館証 =====
+function parseBadges(text) {
+    return text.split(/[,、\s]+/).map(s => s.trim()).filter(s => s !== '');
+}
+function badgeText(r) {
+    return (r.badges || []).join('・');
+}
+
+// ===== 入場：基本情報 =====
+function resetEntry() {
+    ['e-name','e-company','e-phone','e-vehicle'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('e-people').value = '1';
+    document.getElementById('e-purpose').value = '';
+    document.querySelectorAll('input[name="temp"]').forEach(r => r.checked = false);
+    document.querySelectorAll('input[name="area"]').forEach(r => r.checked = false);
+    document.getElementById('simple-temp-group').classList.add('hidden');
+    document.getElementById('area-note').textContent = '';
+    document.getElementById('btn-entry-next').textContent = '入場完了';
+    resetFactory();
+}
+
+function onAreaChange() {
+    const areaEl = document.querySelector('input[name="area"]:checked');
+    const area = areaEl ? areaEl.value : '';
+    const tempGroup = document.getElementById('simple-temp-group');
+    const note = document.getElementById('area-note');
+    const btn  = document.getElementById('btn-entry-next');
+
+    if (area === '工場') {
+        tempGroup.classList.add('hidden');
+        document.querySelectorAll('input[name="temp"]').forEach(r => r.checked = false);
+        note.textContent = '※ 次の画面で、入場者全員の氏名・体温・健康状態などをご確認いただきます';
+        btn.textContent = '次へ（工場入場チェック）';
+    } else if (area === '管理棟のみ') {
+        tempGroup.classList.remove('hidden');
+        note.textContent = '';
+        btn.textContent = '入場完了';
+    } else {
+        tempGroup.classList.add('hidden');
+        note.textContent = '';
+        btn.textContent = '入場完了';
+    }
+}
+
+// 基本情報のバリデーション（共通部分）
+function validateBasic() {
+    const v = {
+        name:    document.getElementById('e-name').value.trim(),
+        company: document.getElementById('e-company').value.trim(),
+        phone:   document.getElementById('e-phone').value.trim(),
+        people:  document.getElementById('e-people').value,
+        purpose: document.getElementById('e-purpose').value,
+        vehicle: document.getElementById('e-vehicle').value.trim()
+    };
+    const areaEl = document.querySelector('input[name="area"]:checked');
+    if (!v.name || !v.company || !v.phone || !v.people || !v.purpose || !areaEl) {
+        notify('必須項目をすべて入力してください', 'error'); return null;
+    }
+    if (parseInt(v.people) < 1) {
+        notify('来訪人数を正しく入力してください', 'error'); return null;
+    }
+    v.area = areaEl.value;
+    return v;
+}
+
+// 「入場完了」または「次へ」
+function entryNext() {
+    const v = validateBasic();
+    if (!v) return;
+
+    if (v.area === '工場') {
+        gotoFactoryCheck(v);
+        return;
+    }
+
+    // 管理棟のみ → その場で登録
+    const tempEl = document.querySelector('input[name="temp"]:checked');
+    if (!tempEl) { notify('体温確認を選択してください', 'error'); return; }
+    if (tempEl.value.includes('37.5')) {
+        notify('体温が37.5度以上のため入場できません', 'error'); return;
+    }
+
+    const now = new Date();
+    const records = getRecords();
+    records.push({
+        id: nextId(),
+        date: fmtDate(now), entryTime: fmtTime(now),
+        name: v.name, company: v.company, phone: v.phone,
+        people: parseInt(v.people), purpose: v.purpose, vehicle: v.vehicle,
+        area: '管理棟のみ',
+        dept: '', staff: '',
+        temperature: tempEl.value,
+        members: [],
+        badges: [],
+        carryIn: false, carryInNote: '',
+        agreed: false,
+        pledgeAgreed: false, pledgeBy: '', pledgeAt: '',
+        approvedBy: '', approvedAt: '',
+        exitTime: null, badgeReturned: false, carryInReturned: false
+    });
+    saveRecords(records);
+    showScreen('screen-top');
+    notify('入場登録が完了しました', 'success');
+}
+
+// ===== 工場入場チェック =====
+let pendingBasic = null;
+
+function resetFactory() {
+    document.getElementById('f-dept').value = '';
+    document.getElementById('f-dept-other').value = '';
+    document.getElementById('dept-other-group').classList.add('hidden');
+    document.getElementById('f-badge').value = '';
+    document.getElementById('f-staff').value = '';
+    document.getElementById('f-carryin-note').value = '';
+    document.getElementById('carryin-note-group').classList.add('hidden');
+    document.querySelectorAll('input[name="carryin"]').forEach(r => r.checked = false);
+    document.getElementById('f-agree').checked = false;
+    document.getElementById('f-pledge').checked = false;
+    document.getElementById('pledge-who').textContent = '同意者：－';
+    document.getElementById('member-list').innerHTML = '';
+    document.getElementById('suggest-area').classList.add('hidden');
+}
+
+function gotoFactoryCheck(basic) {
+    pendingBasic = basic;
+    resetFactory();
+    document.getElementById('pledge-who').textContent =
+        `同意者：${basic.company}　${basic.name} 様（代表者）`;
+
+    // 人数分の行を自動生成（1行目は代表者名を自動入力）
+    const n = Math.max(1, parseInt(basic.people));
+    for (let i = 0; i < n; i++) {
+        addMemberRow(i === 0 ? basic.name : '');
+    }
+    renderSuggestions(basic.company);
+    showScreen('screen-factory');
+}
+
+function onDeptChange() {
+    const v = document.getElementById('f-dept').value;
+    document.getElementById('dept-other-group').classList.toggle('hidden', v !== 'その他');
+}
+
+function onCarryInChange() {
+    const el = document.querySelector('input[name="carryin"]:checked');
+    const show = el && el.value === '有';
+    document.getElementById('carryin-note-group').classList.toggle('hidden', !show);
+    if (!show) document.getElementById('f-carryin-note').value = '';
+}
+
+// --- 入場者行 ---
+function addMemberRow(name) {
+    const list = document.getElementById('member-list');
+    const row = document.createElement('div');
+    row.className = 'member-row';
+    row.innerHTML = `
+        <div class="m-no"></div>
+        <div class="m-name"><input type="text" class="in-name" placeholder="氏名" value="${esc(name || '')}"></div>
+        <div class="m-temp"><input type="number" class="in-temp" step="0.1" inputmode="decimal" placeholder="36.5"></div>
+        <div class="m-unit">℃</div>
+        <div class="m-tgl"><button type="button" class="toggle-btn tg-ok in-health" data-ng="0" onclick="toggleBtn(this,'良好','不良')">良好</button></div>
+        <div class="m-tgl"><button type="button" class="toggle-btn tg-ok in-natto" data-ng="0" onclick="toggleBtn(this,'なし','喫食あり')">なし</button></div>
+        <div class="m-del"><button type="button" class="row-del-btn" onclick="delMemberRow(this)">×</button></div>
+    `;
+    list.appendChild(row);
+    renumberMembers();
+}
+
+function delMemberRow(btn) {
+    const list = document.getElementById('member-list');
+    if (list.children.length <= 1) { notify('入場者は1名以上必要です', 'error'); return; }
+    btn.closest('.member-row').remove();
+    renumberMembers();
+}
+
+function renumberMembers() {
+    document.querySelectorAll('#member-list .member-row').forEach((r, i) => {
+        r.querySelector('.m-no').textContent = (i + 1) + '.';
+    });
+}
+
+function toggleBtn(btn, okText, ngText) {
+    const ng = btn.dataset.ng === '1';
+    btn.dataset.ng = ng ? '0' : '1';
+    btn.textContent = ng ? okText : ngText;
+    btn.classList.toggle('tg-ok', ng);
+    btn.classList.toggle('tg-ng', !ng);
+}
+
+// --- 過去の来訪者を候補表示（マスタ登録不要の自己学習型） ---
+function renderSuggestions(company) {
+    const names = new Set();
+    getRecords().forEach(r => {
+        if (r.company !== company) return;
+        if (r.name) names.add(r.name);
+        (r.members || []).forEach(m => { if (m.name) names.add(m.name); });
+    });
+    const area = document.getElementById('suggest-area');
+    const box  = document.getElementById('suggest-chips');
+    const list = [...names].slice(0, 16);
+    if (!list.length) { area.classList.add('hidden'); box.innerHTML = ''; return; }
+    box.innerHTML = list.map(n =>
+        `<button type="button" class="chip" onclick="applySuggestion('${esc(n).replace(/'/g, "\\'")}')">${esc(n)}</button>`
+    ).join('');
+    area.classList.remove('hidden');
+}
+
+// 最初の空欄に氏名を入れる（空欄がなければ行を追加）
+function applySuggestion(name) {
+    const inputs = [...document.querySelectorAll('#member-list .in-name')];
+    const empty = inputs.find(i => !i.value.trim());
+    if (empty) { empty.value = name; return; }
+    addMemberRow(name);
+}
+
+// --- 登録 ---
+function submitFactoryEntry() {
+    if (!pendingBasic) { notify('基本情報が読み込めません。最初からやり直してください', 'error'); return; }
+
+    // 入場課
+    let dept = document.getElementById('f-dept').value;
+    if (!dept) { notify('入場課又は箇所を選択してください', 'error'); return; }
+    if (dept === 'その他') {
+        const other = document.getElementById('f-dept-other').value.trim();
+        if (!other) { notify('その他の入場箇所を入力してください', 'error'); return; }
+        dept = 'その他：' + other;
+    }
+
+    // 入館証
+    const badges = parseBadges(document.getElementById('f-badge').value);
+    if (!badges.length) { notify('入館証番号を入力してください', 'error'); return; }
+
+    // 入場者
+    const rows = [...document.querySelectorAll('#member-list .member-row')];
+    const members = [];
+    for (let i = 0; i < rows.length; i++) {
+        const nm   = rows[i].querySelector('.in-name').value.trim();
+        const tp   = rows[i].querySelector('.in-temp').value.trim();
+        const hNg  = rows[i].querySelector('.in-health').dataset.ng === '1';
+        const nNg  = rows[i].querySelector('.in-natto').dataset.ng === '1';
+
+        if (!nm) { notify(`${i+1}行目の氏名を入力してください`, 'error'); return; }
+        if (!tp) { notify(`${i+1}行目（${nm}）の体温を入力してください`, 'error'); return; }
+        const t = parseFloat(tp);
+        if (isNaN(t) || t < 30 || t > 45) {
+            notify(`${i+1}行目（${nm}）の体温を正しく入力してください`, 'error'); return;
+        }
+        if (t >= 37.5) {
+            notify(`${nm} 様は体温が37.5度以上のため入場できません。行を削除してください`, 'error'); return;
+        }
+        if (hNg) {
+            notify(`${nm} 様は健康状態不良のため入場できません。行を削除してください`, 'error'); return;
+        }
+        if (nNg) {
+            notify(`${nm} 様は当日納豆を喫食されているため入場できません。行を削除してください`, 'error'); return;
+        }
+        members.push({ name: nm, temp: t.toFixed(1), health: '良好', natto: 'なし' });
+    }
+
+    // 対応者
+    const staff = document.getElementById('f-staff').value.trim();
+    if (!staff) { notify('対応者氏名を入力してください', 'error'); return; }
+
+    // 持込品
+    const ciEl = document.querySelector('input[name="carryin"]:checked');
+    if (!ciEl) { notify('持込品の有無を選択してください', 'error'); return; }
+    const carryIn = ciEl.value === '有';
+    const carryInNote = carryIn ? document.getElementById('f-carryin-note').value.trim() : '';
+    if (carryIn && !carryInNote) { notify('持込品の内容を入力してください', 'error'); return; }
+
+    // 誓約事項への同意（来訪者）
+    if (!document.getElementById('f-pledge').checked) {
+        notify('来訪者による誓約事項への同意チェックを入れてください', 'error'); return;
+    }
+    // 説明・確認（受付）
+    if (!document.getElementById('f-agree').checked) {
+        notify('受付による説明・確認チェックを入れてください', 'error'); return;
+    }
+
+    const now = new Date();
+    const records = getRecords();
+    records.push({
+        id: nextId(),
+        date: fmtDate(now), entryTime: fmtTime(now),
+        name: pendingBasic.name, company: pendingBasic.company, phone: pendingBasic.phone,
+        people: members.length, purpose: pendingBasic.purpose, vehicle: pendingBasic.vehicle,
+        area: '工場',
+        dept: dept, staff: staff,
+        temperature: '',
+        members: members,
+        badges: badges,
+        carryIn: carryIn, carryInNote: carryInNote,
+        agreed: true,
+        pledgeAgreed: true,
+        pledgeBy: pendingBasic.name,
+        pledgeAt: fmtDateTime(now),
+        approvedBy: '', approvedAt: '',
+        exitTime: null, badgeReturned: false, carryInReturned: false
+    });
+    saveRecords(records);
+    pendingBasic = null;
+    showScreen('screen-top');
+    notify(`入場登録が完了しました（${members.length}名）`, 'success');
+}
+
+// ===== 退場一覧 =====
+function renderExitList() {
+    const active = getRecords().filter(r => !r.exitTime);
+    const total = active.reduce((s, r) => s + (r.people || 1), 0);
+    document.getElementById('visitor-count').textContent =
+        `現在入場中：${active.length}件 / ${total}名`;
+    document.getElementById('visitor-list').innerHTML = active.length
+        ? active.map(r => {
+            const sub = r.area === '工場'
+                ? `${r.dept}　入館証：${badgeText(r)}`
+                : '管理棟のみ';
+            return `
+            <div class="visitor-card" onclick="selectVisitor(${r.id})">
+                <div>
+                    <div class="visitor-name">${esc(r.company)}　${esc(r.name)} 様 （${r.people}名）</div>
+                    <div class="visitor-detail">入場：${r.entryTime}　　${esc(sub)}</div>
+                </div>
+                <div class="visitor-arrow">›</div>
+            </div>`;
+          }).join('')
+        : '<div class="no-visitors">現在入場中の来訪者はいません</div>';
+}
+
+// ===== 退場確認 =====
+let selectedId = null;
+function selectVisitor(id) {
+    selectedId = id;
+    const v = getRecords().find(r => r.id === id);
+    if (!v) return;
+
+    document.getElementById('c-name').textContent    = '氏名　　：' + v.name + ' 様';
+    document.getElementById('c-company').textContent = '会社名　：' + v.company;
+    document.getElementById('c-area').textContent    = '入場区分：' + v.area + (v.dept ? '（' + v.dept + '）' : '');
+    document.getElementById('c-people').textContent  = '人数　　：' + v.people + '名';
+    document.getElementById('c-entry').textContent   = '入場時刻：' + v.entryTime;
+
+    // 入館証
+    const bt = badgeText(v);
+    const badgeRow = document.getElementById('c-badge');
+    const badgeChk = document.getElementById('badge-check-row');
+    document.getElementById('badge-check').checked = false;
+    if (bt) {
+        badgeRow.textContent = '入館証　：' + bt;
+        badgeRow.classList.remove('hidden');
+        badgeChk.classList.remove('hidden');
+    } else {
+        badgeRow.classList.add('hidden');
+        badgeChk.classList.add('hidden');
+    }
+
+    // 持込品
+    const ciRow = document.getElementById('c-carryin');
+    const ciChk = document.getElementById('carryin-check-row');
+    document.getElementById('carryin-check').checked = false;
+    if (v.carryIn) {
+        ciRow.textContent = '持込品　：' + v.carryInNote;
+        ciRow.classList.remove('hidden');
+        ciChk.classList.remove('hidden');
+    } else {
+        ciRow.classList.add('hidden');
+        ciChk.classList.add('hidden');
+    }
+
+    showScreen('screen-exit-confirm');
+}
+
+function submitExit() {
+    const records = getRecords();
+    const idx = records.findIndex(r => r.id === selectedId);
+    if (idx === -1) { notify('記録が見つかりません', 'error'); return; }
+    const v = records[idx];
+
+    const hasBadge = badgeText(v) !== '';
+    if (hasBadge && !document.getElementById('badge-check').checked) {
+        notify('入館証の返却確認チェックを入れてください', 'error'); return;
+    }
+    if (v.carryIn && !document.getElementById('carryin-check').checked) {
+        notify('持込品の持ち帰り確認チェックを入れてください', 'error'); return;
+    }
+
+    const now = new Date();
+    records[idx].exitTime        = fmtTime(now);
+    records[idx].badgeReturned   = hasBadge;
+    records[idx].carryInReturned = !!v.carryIn;
+    saveRecords(records);
+    showScreen('screen-top');
+    notify('退場登録が完了しました', 'success');
+}
+
+// ===== データ管理 =====
+function gotoMgmt() {
+    const records = getRecords();
+    document.getElementById('mgmt-total').textContent = records.length;
+    if (records.length) {
+        const dates = records.map(r => r.date).sort();
+        document.getElementById('mgmt-oldest').textContent = dates[0];
+        document.getElementById('mgmt-newest').textContent = dates[dates.length - 1];
+    } else {
+        document.getElementById('mgmt-oldest').textContent = '－';
+        document.getElementById('mgmt-newest').textContent = '－';
+    }
+    const bytes = new Blob([localStorage.getItem(STORE_KEY) || '']).size;
+    document.getElementById('mgmt-size').textContent = Math.ceil(bytes / 1024);
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yStr = fmtDate(yesterday);
+
+    document.getElementById('export-date').value = yStr;
+    updateExportCount();
+    document.getElementById('view-date').value = yStr;
+    document.getElementById('view-date-count').textContent = '';
+    document.getElementById('record-list').innerHTML = '';
+
+    document.getElementById('approve-date').value = yStr;
+    document.getElementById('approve-name').value = '';
+    refreshApprove();
+
+    showScreen('screen-mgmt');
+}
+
+// ===== 工場入場記録の承認（業務課課長・事後承認） =====
+function factoryRecordsOn(dateVal) {
+    return getRecords().filter(r => r.date === dateVal && r.area === '工場');
+}
+
+function refreshApprove() {
+    const dateVal = document.getElementById('approve-date').value;
+    const box = document.getElementById('approve-status');
+    const row = document.getElementById('approve-input-row');
+
+    if (!dateVal) {
+        box.className = 'approve-status appr-none';
+        box.textContent = '日付を選んで「確認」をタップしてください';
+        row.classList.add('hidden');
+        return;
+    }
+
+    const recs = factoryRecordsOn(dateVal);
+    if (!recs.length) {
+        box.className = 'approve-status appr-none';
+        box.textContent = `${dateVal} の工場入場記録はありません`;
+        row.classList.add('hidden');
+        return;
+    }
+
+    const done    = recs.filter(r => r.approvedBy);
+    const pending = recs.filter(r => !r.approvedBy);
+    const notExit = recs.filter(r => !r.exitTime).length;
+
+    if (!pending.length) {
+        box.className = 'approve-status appr-done';
+        box.textContent =
+            `✅ ${dateVal} の工場入場記録 ${recs.length}件は承認済みです`
+            + `（承認者：${done[0].approvedBy}　${done[0].approvedAt}）`;
+    } else {
+        box.className = 'approve-status appr-pending';
+        box.textContent =
+            `${dateVal} の工場入場記録：${recs.length}件（未承認 ${pending.length}件）`
+            + (notExit ? `　⚠️ 未退場 ${notExit}件` : '');
+    }
+    row.classList.remove('hidden');
+}
+
+function confirmApprove() {
+    const dateVal = document.getElementById('approve-date').value;
+    const who = document.getElementById('approve-name').value.trim();
+    if (!dateVal) { notify('日付を選択してください', 'error'); return; }
+    if (!who) { notify('承認者名を入力してください', 'error'); return; }
+
+    const recs = factoryRecordsOn(dateVal);
+    if (!recs.length) { notify(`${dateVal} の工場入場記録がありません`, 'error'); return; }
+
+    const pending = recs.filter(r => !r.approvedBy).length;
+    const notExit = recs.filter(r => !r.exitTime).length;
+    const already = recs.length - pending;
+
+    let msg = `${dateVal} の工場入場記録 ${recs.length}件を「${who}」として承認します。`;
+    if (already) msg += `\n※ うち ${already}件は承認済みです。承認者・承認日時が上書きされます。`;
+    if (notExit) msg += `\n⚠️ 未退場の記録が ${notExit}件あります。`;
+
+    openModal('工場入場記録の承認', msg, '承認する', '#2E7D32', () => {
+        const all = getRecords();
+        const stamp = fmtDateTime(new Date());
+        all.forEach(r => {
+            if (r.date === dateVal && r.area === '工場') {
+                r.approvedBy = who;
+                r.approvedAt = stamp;
+            }
+        });
+        saveRecords(all);
+        closeModal();
+        notify(`${recs.length}件を承認しました`, 'success');
+        refreshApprove();
+    });
+}
+
+// ===== 記録閲覧 =====
+function renderRecordView() {
+    const dateVal = document.getElementById('view-date').value;
+    if (!dateVal) { notify('日付を選択してください', 'error'); return; }
+
+    const data = getRecords().filter(r => r.date === dateVal)
+        .sort((a, b) => a.entryTime.localeCompare(b.entryTime));
+
+    const countEl = document.getElementById('view-date-count');
+    const listEl  = document.getElementById('record-list');
+
+    if (!data.length) {
+        countEl.textContent = `${dateVal} の記録はありません`;
+        listEl.innerHTML = '';
+        return;
+    }
+
+    const total = data.reduce((s, r) => s + (r.people || 1), 0);
+    countEl.textContent = `${dateVal} の記録：${data.length}件 / ${total}名`;
+
+    listEl.innerHTML = data.map((r, i) => {
+        const membersHtml = (r.members || []).length
+            ? r.members.map((m, k) =>
+                `<div class="member-mini">${k+1}. ${esc(m.name)}　体温 ${esc(m.temp)}℃　健康 ${esc(m.health)}　納豆 ${esc(m.natto)}</div>`
+              ).join('')
+            : '<span style="color:#AAA;">－</span>';
+
+        return `
+        <div class="record-card">
+            <div class="record-header" onclick="toggleRecord(${i})">
+                <div class="record-header-left">
+                    <span class="record-time">${r.entryTime}</span>
+                    <span class="record-summary">${esc(r.company)}　${esc(r.name)} 様（${r.people}名）</span>
+                    ${r.area === '工場' ? '<span class="record-status status-factory">工場</span>' : ''}
+                    ${r.approvedBy ? '<span class="record-status status-approved">承認済</span>' : ''}
+                </div>
+                <span class="record-status ${r.exitTime ? 'status-done' : 'status-active'}">
+                    ${r.exitTime ? '退場済' : '入場中'}
+                </span>
+            </div>
+            <div class="record-detail" id="record-detail-${i}">
+                <div class="record-detail-row"><span class="record-detail-label">会社名</span><span class="record-detail-value">${esc(r.company)}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">代表者</span><span class="record-detail-value">${esc(r.name)}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">電話番号</span><span class="record-detail-value">${esc(r.phone) || '－'}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">人数</span><span class="record-detail-value">${r.people}名</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">用件</span><span class="record-detail-value">${esc(r.purpose)}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">入場区分</span><span class="record-detail-value">${esc(r.area)}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">入場課</span><span class="record-detail-value">${esc(r.dept) || '－'}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">対応者</span><span class="record-detail-value">${esc(r.staff) || '－'}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">車両番号</span><span class="record-detail-value">${esc(r.vehicle) || '－'}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">入館証</span><span class="record-detail-value">${esc(badgeText(r)) || '－（配布なし）'}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">持込品</span><span class="record-detail-value">${r.carryIn ? esc(r.carryInNote) : '無'}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">入場時刻</span><span class="record-detail-value">${r.entryTime}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">退場時刻</span><span class="record-detail-value">${r.exitTime || '－（未退場）'}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">入館証返却</span><span class="record-detail-value">${!badgeText(r) ? '－（対象外）' : (r.badgeReturned ? '✅ 確認済' : '⬜ 未確認')}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">持込品返却</span><span class="record-detail-value">${!r.carryIn ? '－（対象外）' : (r.carryInReturned ? '✅ 確認済' : '⬜ 未確認')}</span></div>
+                <div class="record-detail-row" style="display:block;">
+                    <div class="record-detail-label" style="width:auto; margin-bottom:4px;">入場者（体温・健康状態・納豆）</div>
+                    ${membersHtml}
+                </div>
+                ${r.area === '工場' ? `
+                <div class="record-detail-row"><span class="record-detail-label">受付確認</span><span class="record-detail-value">${r.agreed ? '✅ 説明・確認済' : '⬜ 未確認'}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">誓約同意</span><span class="record-detail-value">${r.pledgeAgreed ? `✅ 同意済（${esc(r.pledgeBy)} 様　${esc(r.pledgeAt)}）` : '⬜ 未同意'}</span></div>
+                <div class="record-detail-row"><span class="record-detail-label">課長承認</span><span class="record-detail-value">${r.approvedBy ? `✅ ${esc(r.approvedBy)}　${esc(r.approvedAt)}` : '⬜ 未承認'}</span></div>
+                ` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function toggleRecord(i) {
+    document.getElementById(`record-detail-${i}`).classList.toggle('open');
+}
+
+// ===== CSV =====
+function updateExportCount() {
+    const dateVal = document.getElementById('export-date').value;
+    if (!dateVal) { document.getElementById('export-date-count').textContent = ''; return; }
+    const recs = getRecords().filter(r => r.date === dateVal);
+    const total = recs.reduce((s, r) => s + (r.people || 1), 0);
+    document.getElementById('export-date-count').textContent =
+        recs.length ? `${dateVal} の記録：${recs.length}件 / ${total}名` : `${dateVal} の記録はありません`;
+}
+
+function exportCSVByDate() {
+    const dateVal = document.getElementById('export-date').value;
+    if (!dateVal) { notify('日付を選択してください', 'error'); return; }
+    const data = getRecords().filter(r => r.date === dateVal);
+    if (!data.length) { notify(`${dateVal} の記録がありません`, 'error'); return; }
+    doExport(data, `来訪者記録_${dateVal}.csv`);
+}
+
+function exportCSVAll() {
+    const data = getRecords();
+    if (!data.length) { notify('エクスポートするデータがありません', 'error'); return; }
+    doExport(data, `来訪者記録_全件_${fmtDate(new Date())}.csv`);
+}
+
+// 入場者1名＝1行で出力（トレーサビリティ確保のため）
+function doExport(data, filename) {
+    const headers = [
+        '日付','入場時刻','退場時刻','会社名','代表者','電話番号','用件','人数',
+        '入場区分','入場課','区分','氏名','体温','健康状態','納豆喫食',
+        '車両番号','入館証番号','入館証返却','持込品','持込品内容','持込品持ち帰り',
+        '対応者','受付確認','誓約同意','誓約同意者','誓約同意日時','課長承認者','課長承認日時'
+    ];
+    const rows = [];
+    let persons = 0;
+
+    data.forEach(r => {
+        const base = [
+            r.date, r.entryTime, r.exitTime || '', r.company, r.name, r.phone || '', r.purpose, r.people,
+            r.area, r.dept || ''
+        ];
+        const tail = [
+            r.vehicle || '',
+            badgeText(r),
+            !badgeText(r) ? '対象外' : (r.badgeReturned ? '確認済' : '未確認'),
+            r.carryIn ? '有' : '無',
+            r.carryIn ? r.carryInNote : '',
+            !r.carryIn ? '対象外' : (r.carryInReturned ? '確認済' : '未確認'),
+            r.staff || '',
+            r.area === '工場' ? (r.agreed ? '確認済' : '未確認') : '対象外',
+            r.area === '工場' ? (r.pledgeAgreed ? '同意済' : '未同意') : '対象外',
+            r.pledgeBy || '',
+            r.pledgeAt || '',
+            r.approvedBy || '',
+            r.approvedAt || ''
+        ];
+
+        if ((r.members || []).length) {
+            r.members.forEach((m, i) => {
+                rows.push([...base, i === 0 ? '代表者' : '同行者', m.name, m.temp, m.health, m.natto, ...tail]);
+                persons++;
+            });
+        } else {
+            // 管理棟のみ：体温は区分判定のみ、健康状態・納豆は工場入場者が対象
+            rows.push([...base, '代表者', r.name, r.temperature || '', '対象外', '対象外', ...tail]);
+            persons++;
+        }
+    });
+
+    const csv = '\ufeff' + [headers, ...rows]
+        .map(row => row.map(c => `"${String(c == null ? '' : c).replace(/"/g,'""')}"`).join(','))
+        .join('\r\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    notify(`${data.length}件 / ${persons}名分をCSV出力しました`, 'success');
+}
+
+// ===== モーダル共通 =====
+function openModal(title, msg, okText, okColor, onOk) {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-msg').textContent = msg;
+    const ok = document.getElementById('modal-ok');
+    ok.textContent = okText;
+    ok.style.backgroundColor = okColor;
+    ok.onclick = onOk;
+    document.getElementById('modal').classList.add('active');
+}
+
+// ===== 削除 =====
+let pendingDelete = null;
+function confirmDeleteOld() {
+    const days = parseInt(document.getElementById('keep-days').value);
+    if (!days || days < 1) { notify('日数を正しく入力してください', 'error'); return; }
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffStr = fmtDate(cutoff);
+    const records = getRecords();
+    const target = records.filter(r => r.date < cutoffStr);
+    if (!target.length) { notify(`${days}日以上前のデータはありません`, 'error'); return; }
+    openModal('古いデータの削除',
+        `${cutoffStr} より前のデータ ${target.length} 件を削除します。\nCSVエクスポートは完了していますか？`,
+        '削除する', '#C0392B', () => {
+            saveRecords(records.filter(r => r.date >= cutoffStr));
+            closeModal();
+            notify(`${target.length}件を削除しました`, 'success');
+            gotoMgmt();
+        });
+}
+
+function confirmDeleteAll() {
+    const count = getRecords().length;
+    if (!count) { notify('削除するデータがありません', 'error'); return; }
+    openModal('全データの削除',
+        `保存されている全記録 ${count} 件を削除します。\nこの操作は取り消せません。\nCSVエクスポートは完了していますか？`,
+        '削除する', '#C0392B', () => {
+            saveRecords([]);
+            closeModal();
+            notify('全データを削除しました', 'success');
+            gotoMgmt();
+        });
+}
+
+function closeModal() {
+    document.getElementById('modal').classList.remove('active');
+    pendingDelete = null;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('export-date').addEventListener('change', updateExportCount);
+});
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw-factory.js', { scope: '/reception-factory.html' });
+    });
+}
+</script>
+</body>
+</html>

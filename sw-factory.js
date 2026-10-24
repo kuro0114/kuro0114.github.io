@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reception-factory-v2';
+const CACHE_NAME = 'reception-factory-v3';
 const CACHE_FILES = ['/reception-factory.html'];
 
 self.addEventListener('install', event => {

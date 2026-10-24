@@ -457,6 +457,99 @@
         .btn-modal-cancel { background: #EEE; color: #333; border: none; padding: 12px 32px; font-size: 16px; border-radius: 8px; cursor: pointer; }
         .btn-modal-ok { background: #C0392B; color: white; border: none; padding: 12px 32px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; }
 
+        /* ===== PR表示（スクリーンセーバー） ===== */
+        #pr-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 5000;
+            align-items: center;
+            justify-content: center;
+        }
+        #pr-overlay.active { display: flex; }
+        #pr-img, #pr-video {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+        .pr-hint {
+            position: absolute;
+            bottom: 36px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.88);
+            color: #1F497D;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 12px 32px;
+            border-radius: 28px;
+            pointer-events: none;
+            animation: prPulse 2.4s ease-in-out infinite;
+        }
+        @keyframes prPulse { 0%,100% { opacity: .95; } 50% { opacity: .5; } }
+
+        /* PR設定 */
+        .pr-setting-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .pr-setting-label { font-size: 15px; width: 170px; flex-shrink: 0; }
+        .pr-select {
+            padding: 10px 14px;
+            font-size: 15px;
+            border: 1px solid #CCC;
+            border-radius: 6px;
+            background: white;
+            font-family: inherit;
+            min-width: 150px;
+        }
+        .pr-media-list { margin-top: 10px; }
+        .pr-media-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border: 1px solid #E0E0E0;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            background: #FAFAFA;
+        }
+        .pr-thumb {
+            width: 56px; height: 40px; flex-shrink: 0;
+            object-fit: cover; border-radius: 4px; background: #DDD;
+        }
+        .pr-thumb-icon {
+            width: 56px; height: 40px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: #E0E0E0; border-radius: 4px; font-size: 20px;
+        }
+        .pr-media-name { flex: 1; font-size: 14px; word-break: break-all; }
+        .pr-media-size { font-size: 12px; color: #888; white-space: nowrap; }
+        .pr-mini-btn {
+            width: 38px; padding: 8px 0;
+            background: white; border: 1px solid #CCC; color: #555;
+            border-radius: 5px; font-size: 14px; cursor: pointer;
+            font-family: inherit; flex-shrink: 0;
+        }
+        .pr-mini-btn:disabled { opacity: .3; }
+        .pr-del-btn { color: #C0392B; border-color: #E6B0AA; }
+        .pr-empty { text-align: center; padding: 20px; color: #AAA; font-size: 14px; }
+        .pr-size-total { font-size: 14px; color: #555; margin-top: 10px; }
+        .pr-size-total span { font-weight: bold; color: #1F497D; }
+        .pr-size-warn { color: #C0392B !important; }
+        .btn-file {
+            display: inline-block;
+            background: white; border: 2px dashed #1F497D; color: #1F497D;
+            padding: 11px 24px; font-size: 15px; font-weight: bold;
+            border-radius: 6px; cursor: pointer; font-family: inherit;
+        }
+
         /* 通知 */
         #notification {
             position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
@@ -783,6 +876,50 @@
         </div>
 
         <div class="mgmt-card">
+            <div class="mgmt-card-title">🖼️ PR表示設定（画面未操作時）</div>
+            <div class="mgmt-info">受付のトップ画面で一定時間操作がないとき、登録したPR画像・動画を全画面表示します。</div>
+
+            <div class="pr-setting-row" style="margin-top:14px;">
+                <span class="pr-setting-label">PR表示までの時間</span>
+                <select id="pr-idle" class="pr-select" onchange="savePRForm()">
+                    <option value="0">表示しない</option>
+                    <option value="30">30秒</option>
+                    <option value="60">1分</option>
+                    <option value="120">2分</option>
+                    <option value="180">3分</option>
+                    <option value="300">5分</option>
+                    <option value="600">10分</option>
+                </select>
+            </div>
+            <div class="pr-setting-row">
+                <span class="pr-setting-label">1枚あたりの表示時間</span>
+                <select id="pr-slide" class="pr-select" onchange="savePRForm()">
+                    <option value="5">5秒</option>
+                    <option value="10">10秒</option>
+                    <option value="15">15秒</option>
+                    <option value="20">20秒</option>
+                    <option value="30">30秒</option>
+                    <option value="60">1分</option>
+                </select>
+                <span class="field-note" style="margin:0;">※ 動画は最後まで再生されます</span>
+            </div>
+
+            <div class="pr-media-list" id="pr-media-list"></div>
+            <div class="pr-size-total" id="pr-size-total"></div>
+
+            <div class="mgmt-row">
+                <label class="btn-file">
+                    ＋ ファイルを追加
+                    <input type="file" id="pr-file" accept="image/*,video/*" multiple
+                           style="display:none;" onchange="addPRFiles(this)">
+                </label>
+                <button class="btn-export" onclick="previewPR()">プレビュー</button>
+            </div>
+            <div class="mgmt-note">※ 画像はJPEG/PNG、動画はMP4を推奨します。動画は音声なしで再生されます</div>
+            <div class="mgmt-note">※ PR表示中はiPadの「自動ロック」を「なし」に設定し、電源に接続してください</div>
+        </div>
+
+        <div class="mgmt-card">
             <div class="mgmt-card-title">🗓️ 古いデータを削除</div>
             <div class="mgmt-info">CSVエクスポート済みの古いデータを削除できます。</div>
             <div class="mgmt-row">
@@ -802,6 +939,13 @@
         </div>
 
     </div>
+</div>
+
+<!-- PR表示オーバーレイ -->
+<div id="pr-overlay" onclick="closePR()">
+    <img id="pr-img" alt="" class="hidden">
+    <video id="pr-video" class="hidden" muted playsinline webkit-playsinline></video>
+    <div class="pr-hint">画面をタッチしてください</div>
 </div>
 
 <!-- モーダル -->
@@ -834,9 +978,11 @@ function nextId() {
 
 // ===== 画面遷移 =====
 function showScreen(id) {
+    if (typeof prActive !== 'undefined' && prActive) stopPR();    // PR表示中なら終了させる
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     document.getElementById(id).scrollTop = 0;
+    if (typeof resetIdleTimer === 'function') resetIdleTimer();   // PR表示タイマー
 }
 function gotoEntry() { resetEntry(); showScreen('screen-entry'); }
 function gotoExitList() { renderExitList(); showScreen('screen-exit-list'); }
@@ -1290,6 +1436,8 @@ function gotoMgmt() {
     document.getElementById('approve-name').value = '';
     refreshApprove();
 
+    renderPRList();
+
     showScreen('screen-mgmt');
 }
 
@@ -1580,6 +1728,267 @@ function closeModal() {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('export-date').addEventListener('change', updateExportCount);
 });
+
+/* =====================================================================
+   PR表示（画面未操作時のスクリーンセーバー）
+   ・素材は IndexedDB に保存（localStorageは容量5MBのため使用不可）
+   ・設定は localStorage に保存
+   ===================================================================== */
+
+const PR_DB = 'receptionPR', PR_STORE = 'media', PR_SETTINGS_KEY = 'pr_settings';
+const PR_SIZE_WARN = 100 * 1024 * 1024;   // 100MB を超えたら警告
+
+// --- IndexedDB ---
+function prOpen() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(PR_DB, 1);
+        req.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(PR_STORE)) {
+                db.createObjectStore(PR_STORE, { keyPath: 'id', autoIncrement: true });
+            }
+        };
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = () => reject(req.error);
+    });
+}
+
+function prTx(mode, fn) {
+    return prOpen().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(PR_STORE, mode);
+        let result;
+        const req = fn(tx.objectStore(PR_STORE));
+        if (req) req.onsuccess = e => { result = e.target.result; };
+        tx.oncomplete = () => { db.close(); resolve(result); };
+        tx.onerror    = () => { db.close(); reject(tx.error); };
+        tx.onabort    = () => { db.close(); reject(tx.error); };
+    }));
+}
+
+function prGetAll() {
+    return prTx('readonly', s => s.getAll())
+        .then(list => (list || []).sort((a, b) => a.order - b.order));
+}
+
+// --- 設定 ---
+function getPRSettings() {
+    const def = { idleSeconds: 0, slideSeconds: 10 };
+    try { return Object.assign(def, JSON.parse(localStorage.getItem(PR_SETTINGS_KEY) || '{}')); }
+    catch (e) { return def; }
+}
+function savePRSettings(s) {
+    localStorage.setItem(PR_SETTINGS_KEY, JSON.stringify(s));
+}
+function savePRForm() {
+    savePRSettings({
+        idleSeconds:  parseInt(document.getElementById('pr-idle').value),
+        slideSeconds: parseInt(document.getElementById('pr-slide').value)
+    });
+    resetIdleTimer();
+    notify('PR表示設定を保存しました', 'success');
+}
+
+function fmtBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1024 * 1024) return (b / 1024).toFixed(0) + ' KB';
+    return (b / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+// --- 一覧表示 ---
+async function renderPRList() {
+    const s = getPRSettings();
+    document.getElementById('pr-idle').value  = String(s.idleSeconds);
+    document.getElementById('pr-slide').value = String(s.slideSeconds);
+
+    let items = [];
+    try { items = await prGetAll(); }
+    catch (e) {
+        document.getElementById('pr-media-list').innerHTML =
+            '<div class="pr-empty">素材の読み込みに失敗しました</div>';
+        return;
+    }
+
+    const listEl = document.getElementById('pr-media-list');
+    const sizeEl = document.getElementById('pr-size-total');
+
+    if (!items.length) {
+        listEl.innerHTML = '<div class="pr-empty">登録されている素材はありません</div>';
+        sizeEl.textContent = '';
+        return;
+    }
+
+    listEl.innerHTML = items.map((it, i) => `
+        <div class="pr-media-row">
+            ${it.type === 'image'
+                ? `<img class="pr-thumb" src="${URL.createObjectURL(it.blob)}" alt="" onload="URL.revokeObjectURL(this.src)">`
+                : '<div class="pr-thumb-icon">🎞️</div>'}
+            <span class="pr-media-name">${i + 1}. ${esc(it.name)}</span>
+            <span class="pr-media-size">${fmtBytes(it.size)}</span>
+            <button class="pr-mini-btn" onclick="movePR(${it.id}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+            <button class="pr-mini-btn" onclick="movePR(${it.id}, 1)" ${i === items.length - 1 ? 'disabled' : ''}>↓</button>
+            <button class="pr-mini-btn pr-del-btn" onclick="deletePR(${it.id}, '${esc(it.name).replace(/'/g, "\\'")}')">×</button>
+        </div>`).join('');
+
+    const total = items.reduce((sum, it) => sum + it.size, 0);
+    const over  = total > PR_SIZE_WARN;
+    sizeEl.className = 'pr-size-total' + (over ? ' pr-size-warn' : '');
+    sizeEl.innerHTML = `登録素材：<span>${items.length}</span> 件　使用容量：<span>${fmtBytes(total)}</span>`
+        + (over ? '　⚠️ 容量が大きいため、来訪者記録の保存に影響するおそれがあります' : '');
+}
+
+// --- 追加 ---
+async function addPRFiles(input) {
+    const files = [...input.files];
+    input.value = '';
+    if (!files.length) return;
+
+    const bad = files.find(f => !f.type.startsWith('image/') && !f.type.startsWith('video/'));
+    if (bad) { notify('画像または動画ファイルを選択してください', 'error'); return; }
+
+    try {
+        const existing = await prGetAll();
+        let order = existing.length ? Math.max(...existing.map(x => x.order)) + 1 : 1;
+        for (const f of files) {
+            await prTx('readwrite', s => s.add({
+                name:  f.name,
+                type:  f.type.startsWith('image/') ? 'image' : 'video',
+                mime:  f.type,
+                size:  f.size,
+                blob:  f.slice(0, f.size, f.type),   // メモリに全読み込みせずBlob化
+                order: order++
+            }));
+        }
+        notify(`${files.length}件を追加しました`, 'success');
+        renderPRList();
+    } catch (e) {
+        notify('保存に失敗しました。空き容量をご確認ください', 'error');
+    }
+}
+
+// --- 削除 ---
+function deletePR(id, name) {
+    openModal('PR素材の削除', `「${name}」を削除します。\nよろしいですか？`,
+        '削除する', '#C0392B', async () => {
+            await prTx('readwrite', s => s.delete(id));
+            closeModal();
+            notify('削除しました', 'success');
+            renderPRList();
+        });
+}
+
+// --- 並び替え ---
+async function movePR(id, dir) {
+    const items = await prGetAll();
+    const i = items.findIndex(x => x.id === id);
+    const j = i + dir;
+    if (i === -1 || j < 0 || j >= items.length) return;
+    const a = items[i], b = items[j];
+    const tmp = a.order; a.order = b.order; b.order = tmp;
+    await prTx('readwrite', s => { s.put(a); return s.put(b); });
+    renderPRList();
+}
+
+/* ---------- 無操作タイマー ---------- */
+let idleTimer   = null;
+let prActive    = false;
+let prItems     = [];
+let prIndex     = 0;
+let prSlideTimer = null;
+let prUrl       = null;
+
+function resetIdleTimer() {
+    clearTimeout(idleTimer);
+    if (prActive) return;
+    const s = getPRSettings();
+    if (!s.idleSeconds) return;                                   // 「表示しない」
+    const top = document.getElementById('screen-top');
+    if (!top || !top.classList.contains('active')) return;        // トップ画面のみ発動
+    idleTimer = setTimeout(() => startPR(false), s.idleSeconds * 1000);
+}
+
+['touchstart', 'mousedown', 'keydown', 'wheel'].forEach(ev => {
+    document.addEventListener(ev, () => { if (!prActive) resetIdleTimer(); }, { passive: true });
+});
+
+/* ---------- PR再生 ---------- */
+async function startPR(isPreview) {
+    if (prActive) return;
+    let items = [];
+    try { items = await prGetAll(); } catch (e) { items = []; }
+    if (!items.length) {
+        if (isPreview) notify('PR素材が登録されていません', 'error');
+        return;
+    }
+    // 素材の読み込み中に画面が切り替わった場合は表示しない
+    if (!isPreview) {
+        const top = document.getElementById('screen-top');
+        const s   = getPRSettings();
+        if (prActive || !s.idleSeconds || !top.classList.contains('active')) return;
+    }
+    prItems = items;
+    prIndex = 0;
+    prActive = true;
+    document.getElementById('pr-overlay').classList.add('active');
+    showPRItem();
+}
+
+function previewPR() { startPR(true); }
+
+function clearPRMedia() {
+    clearTimeout(prSlideTimer);
+    const vid = document.getElementById('pr-video');
+    vid.pause();
+    vid.removeAttribute('src');
+    vid.load();
+    vid.classList.add('hidden');
+    document.getElementById('pr-img').classList.add('hidden');
+    if (prUrl) { URL.revokeObjectURL(prUrl); prUrl = null; }
+}
+
+function showPRItem() {
+    clearPRMedia();
+    if (!prItems.length) { stopPR(); return; }
+
+    const item = prItems[prIndex % prItems.length];
+    const wait = getPRSettings().slideSeconds * 1000;
+    prUrl = URL.createObjectURL(item.blob);
+
+    if (item.type === 'image') {
+        const img = document.getElementById('pr-img');
+        img.src = prUrl;
+        img.classList.remove('hidden');
+        prSlideTimer = setTimeout(nextPRItem, wait);
+    } else {
+        const vid = document.getElementById('pr-video');
+        vid.src = prUrl;
+        vid.classList.remove('hidden');
+        vid.onended = nextPRItem;
+        vid.onerror = () => { prSlideTimer = setTimeout(nextPRItem, 1000); };
+        // 自動再生できない場合（iOSの制限など）は時間で切り替え
+        vid.play().catch(() => { prSlideTimer = setTimeout(nextPRItem, wait); });
+    }
+}
+
+function nextPRItem() {
+    if (!prActive) return;
+    prIndex = (prIndex + 1) % prItems.length;
+    showPRItem();
+}
+
+// PR表示を終了する（画面遷移はしない）
+function stopPR() {
+    if (!prActive) return;
+    clearPRMedia();
+    document.getElementById('pr-overlay').classList.remove('active');
+    prActive = false;
+    prItems = [];
+}
+
+// 画面タップでPRを終了し、受付トップへ戻る
+function closePR() {
+    stopPR();
+    showScreen('screen-top');
+}
 </script>
 <script>
 if ('serviceWorker' in navigator) {
